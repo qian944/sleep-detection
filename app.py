@@ -1,57 +1,71 @@
+
 import streamlit as st
 import torch
+import torch.nn as nn
+from torchvision import transforms
+import cv2
+import numpy as np
+from PIL import Image
 import os
 import requests
-from torchvision import transforms
-from PIL import Image
-import numpy as np
-from model import ResNet18_CBAM
-from utils import predict_with_visualization
-import tempfile
 
-# -------------------------------
-# 模型下载配置
+from model import YourModel  # 替换为你的模型类名
+from utils import generate_gradcam  # 你自己的 Grad-CAM 函数
+
+# 模型路径（Hugging Face 模型直链）
 MODEL_URL = "https://huggingface.co/qxliu/srss_model/blob/main/model_final_cb2.pth"
 MODEL_PATH = "model_final_cb2.pth"
 
-# -------------------------------
-# 自动下载模型
-def download_model():
+@st.cache_resource
+def load_model():
     if not os.path.exists(MODEL_PATH):
-        st.info("正在从 Hugging Face 下载模型...")
-        with requests.get(MODEL_URL, stream=True) as r:
-            r.raise_for_status()
-            with open(MODEL_PATH, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-        st.success("模型下载完成！")
+        with st.spinner("⏬ 正在下载模型文件..."):
+            r = requests.get(MODEL_URL)
+            with open(MODEL_PATH, "wb") as f:
+                f.write(r.content)
 
-# -------------------------------
-# 应用主入口
-def main():
-    st.set_page_config(page_title="睡眠评分预测系统", layout="centered")
-    st.title("😴 基于人脸图像的 SRSS 睡眠质量评分")
-
-    # 下载模型
-    download_model()
-
-    # 加载模型
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ResNet18_CBAM()
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-    model.to(device)
+    model = YourModel()  # 替换为你的模型类构造
+    model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
     model.eval()
+    return model
 
-    uploaded_file = st.file_uploader("请上传一张人脸图像（支持jpg/png）", type=['jpg', 'png', 'jpeg'])
+def preprocess(image: Image.Image):
+    # 将PIL图像裁剪上部60%
+    img = np.array(image)
+    h = img.shape[0]
+    upper_img = img[:int(h * 0.6), :, :]
+    image = Image.fromarray(upper_img)
+
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),  # 根据训练时使用的尺寸修改
+        transforms.ToTensor(),
+    ])
+    return transform(image).unsqueeze(0), upper_img
+
+def main():
+    st.title("🧠 基于人脸图像的 SRSS 睡眠评分预测系统")
+    st.markdown("上传一张正脸照片，系统将预测你的睡眠质量评分（SRSS 0-50）并显示关注区域。")
+
+    uploaded_file = st.file_uploader("请上传图片（jpg/png）", type=["jpg", "jpeg", "png"])
+
     if uploaded_file is not None:
         image = Image.open(uploaded_file).convert("RGB")
-        st.image(image, caption='上传的图像', use_column_width=True)
+        st.image(image, caption="原始图像", use_column_width=True)
 
-        # 处理图像并预测
-        with st.spinner('分析中...'):
-            vis_img, score = predict_with_visualization(model, image, device)
-            st.image(vis_img, caption=f"预测结果：SRSS = {score:.1f}", use_column_width=True)
-            st.success("✅ 分析完成")
+        input_tensor, cropped = preprocess(image)
+
+        model = load_model()
+
+        with torch.no_grad():
+            output = model(input_tensor)
+            srss_score = output.item()
+
+        st.subheader(f"📊 预测 SRSS 睡眠评分：**{srss_score:.2f}**")
+
+        # Grad-CAM 可视化
+        st.subheader("🎯 模型关注区域（Grad-CAM）")
+        gradcam_img = generate_gradcam(model, input_tensor, cropped)
+        st.image(gradcam_img, caption="Grad-CAM 热力图", use_column_width=True)
 
 if __name__ == "__main__":
     main()
