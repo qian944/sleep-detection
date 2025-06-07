@@ -6,7 +6,8 @@ from PIL import Image
 import os
 import requests
 
-from model import YourModel  # 替换为你的模型类名
+from model import load_model, generate_heatmap, show_cam_on_image
+from utils import load_image, detect_and_crop_face, default_crop, preprocess_image
 
 # Hugging Face 模型 raw 文件链接，确保链接指向实际权重文件
 MODEL_URL = "https://huggingface.co/qxliu/srss_model/resolve/main/model_final_cb2.pth"
