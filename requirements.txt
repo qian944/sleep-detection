@@ -5,5 +5,4 @@ opencv-python
 numpy
 matplotlib
 Pillow
-mediapipe
 requests
