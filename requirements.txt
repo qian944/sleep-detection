@@ -6,4 +6,4 @@ numpy
 matplotlib
 Pillow
 requests
-libgl1-mesa-glx
+
