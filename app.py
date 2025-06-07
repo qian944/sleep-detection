@@ -1,68 +1,41 @@
 import streamlit as st
-import torch
-from torchvision import transforms
-import numpy as np
 from PIL import Image
-import os
-import requests
+import torch
+from model import SRSSModel
+from utils import preprocess_image, generate_heatmap, load_model_weights
+import numpy as np
 
-from model import load_model, generate_heatmap, predict_score
-from utils import load_image, detect_and_crop_face, default_crop, preprocess_image
-
-# Hugging Face 模型 raw 文件链接，确保链接指向实际权重文件
-MODEL_URL = "https://huggingface.co/qxliu/srss_model/resolve/main/model_final_cb2.pth"
-MODEL_PATH = "model_final_cb2.pth"
-
-@st.cache_resource
+@st.cache(allow_output_mutation=True)
 def load_model():
-    if not os.path.exists(MODEL_PATH):
-        with st.spinner("⏬ 正在下载模型文件..."):
-            r = requests.get(MODEL_URL)
-            if r.status_code != 200:
-                st.error("❌ 模型文件下载失败，请检查链接或稍后再试。")
-                st.stop()
-            with open(MODEL_PATH, "wb") as f:
-                f.write(r.content)
-
-    model = YourModel()  # 替换为你的模型构造函数
-    state_dict = torch.load(MODEL_PATH, map_location="cpu")
-    model.load_state_dict(state_dict)
-    model.eval()
+    model = SRSSModel()
+    # 这里替换成你的huggingface模型文件的直链，比如：
+    model_url = "https://huggingface.co/qxliu/srss_model/resolve/main/model_final_cb2.pth"
+    model = load_model_weights(model, model_url)
     return model
 
-def preprocess(image: Image.Image):
-    img = np.array(image)
-    h = img.shape[0]
-    upper_img = img[:int(h * 0.6), :, :]
-    image = Image.fromarray(upper_img)
-
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-    ])
-    return transform(image).unsqueeze(0), upper_img
-
 def main():
-    st.title("🧠 基于人脸图像的 SRSS 睡眠评分预测系统")
-    st.markdown("上传一张正脸照片，系统将预测你的睡眠质量评分（SRSS 0-50）。")
+    st.title("基于人脸图像的SRSS睡眠质量预测（无Grad-CAM）")
 
-    uploaded_file = st.file_uploader("请上传图片（jpg/png）", type=["jpg", "jpeg", "png"])
-
-    if uploaded_file is not None:
+    uploaded_file = st.file_uploader("上传人脸图片", type=["jpg", "jpeg", "png"])
+    if uploaded_file:
         image = Image.open(uploaded_file).convert("RGB")
-        st.image(image, caption="原始图像", use_column_width=True)
-
-        input_tensor, cropped = preprocess(image)
+        st.image(image, caption="上传的图片", use_column_width=True)
 
         model = load_model()
 
+        input_tensor = preprocess_image(image)
         with torch.no_grad():
-            output = model(input_tensor)
-            srss_score = output.item()
+            pred = model(input_tensor).item()
+        
+        st.write(f"预测SRSS睡眠质量分数：{pred:.2f}")
 
-        st.subheader(f"📊 预测 SRSS 睡眠评分：**{srss_score:.2f}**")
+        # 生成heatmap（示范：基于图像灰度强度的伪heatmap）
+        heatmap = generate_heatmap(image)
+        st.image(heatmap, caption="示例Heatmap（灰度伪热力图）", use_column_width=True)
 
-        st.image(cropped, caption="裁剪后的上部面部区域", use_column_width=True)
+if __name__ == "__main__":
+    main()
+
 
 if __name__ == "__main__":
     main()
