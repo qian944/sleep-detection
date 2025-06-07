@@ -1,10 +1,9 @@
+torch==2.2.0
+torchvision==0.17.0
 streamlit
-torch
-torchvision
-Pillow
+opencv-python
 numpy
 matplotlib
-opencv-python
+Pillow
 mediapipe
-gdown
-tqdm
+requests
