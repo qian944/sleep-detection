@@ -1,31 +1,61 @@
-
 import torch
-import torch.nn as nn
-from torchvision import models, transforms
+import torch.nn.functional as F
+from torchvision import models
+from torchvision.models.feature_extraction import create_feature_extractor
 from PIL import Image
 import numpy as np
-from pytorch_grad_cam import GradCAM
-from pytorch_grad_cam.utils.image import show_cam_on_image
-from model_cbam import ResNet18_CBAM  # 如果是 ResNet18 + CBAM 模型
+import cv2
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = ResNet18_CBAM()
-model.load_state_dict(torch.load("model_final_cb2.pth", map_location=device))
-model.to(device)
-model.eval()
+# 加载模型并返回其主干和用于可视化的目标层
+def load_model():
+    model = models.resnet18(pretrained=True)
+    model.fc = torch.nn.Linear(model.fc.in_features, 1)
+    model.eval()
 
-target_layer = model.features[7][-1]
-cam = GradCAM(model=model, target_layers=[target_layer], use_cuda=torch.cuda.is_available())
+    # 获取某一中间层作为 target layer
+    return model, model.layer4[1].conv2
 
-def predict_and_gradcam(image: Image.Image):
-    image = image.convert("RGB").resize((224, 224))
-    rgb = np.array(image) / 255.0
-    tensor = transforms.ToTensor()(image).unsqueeze(0).to(device)
-
-    grayscale_cam = cam(input_tensor=tensor)[0]
-    vis_img = show_cam_on_image(rgb, grayscale_cam, use_rgb=True)
-
+# 得分预测函数
+def predict_score(model, input_tensor):
     with torch.no_grad():
-        pred = model(tensor).item()
+        output = model(input_tensor)
+    return output.item()
 
-    return vis_img, round(pred)
+# 简单版 Grad-CAM 手写实现
+def generate_heatmap(model, target_layer, input_tensor, orig_pil):
+    feature_map = {}
+    grads = {}
+
+    def forward_hook(module, input, output):
+        feature_map["value"] = output
+
+    def backward_hook(module, grad_in, grad_out):
+        grads["value"] = grad_out[0]
+
+    handle_fw = target_layer.register_forward_hook(forward_hook)
+    handle_bw = target_layer.register_backward_hook(backward_hook)
+
+    model.zero_grad()
+    output = model(input_tensor)
+    output.backward()
+
+    fmap = feature_map["value"][0]  # shape: [C, H, W]
+    grad = grads["value"][0]        # shape: [C, H, W]
+
+    weights = torch.mean(grad, dim=(1, 2))
+    cam = torch.sum(weights[:, None, None] * fmap, dim=0)
+    cam = torch.relu(cam).cpu().numpy()
+
+    # Normalize heatmap
+    cam = (cam - np.min(cam)) / (np.max(cam) - np.min(cam) + 1e-8)
+    cam = cv2.resize(cam, orig_pil.size)
+    cam = np.uint8(255 * cam)
+    heatmap = cv2.applyColorMap(cam, cv2.COLORMAP_JET)
+
+    orig_np = np.array(orig_pil)
+    heatmap = cv2.addWeighted(orig_np, 0.5, heatmap, 0.5, 0)
+
+    handle_fw.remove()
+    handle_bw.remove()
+
+    return Image.fromarray(heatmap)
