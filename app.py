@@ -14,7 +14,7 @@ def load_model():
     return model
 
 def main():
-    st.title("基于人脸图像的SRSS睡眠质量预测（无Grad-CAM）")
+    st.title("基于人脸图像的SRSS睡眠质量预测")
 
     uploaded_file = st.file_uploader("上传人脸图片", type=["jpg", "jpeg", "png"])
     if uploaded_file:
