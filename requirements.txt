@@ -1,0 +1,10 @@
+streamlit
+torch
+torchvision
+Pillow
+numpy
+matplotlib
+opencv-python
+mediapipe
+gdown
+tqdm
