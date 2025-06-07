@@ -33,8 +33,6 @@ def main():
         heatmap = generate_heatmap(image)
         st.image(heatmap, caption="示例Heatmap（灰度伪热力图）", use_column_width=True)
 
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == "__main__":
