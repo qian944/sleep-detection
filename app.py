@@ -36,7 +36,7 @@ if uploaded_file is not None:
             ])
             input_tensor = transform(cropped).unsqueeze(0).to(device)
             with torch.no_grad():
-                score = model(input_tensor).item()
+                score = model(input_tensor)[0].item()
             st.success(f"预测 SRSS 分数为：**{score:.2f}**")
 
             # Grad-CAM
