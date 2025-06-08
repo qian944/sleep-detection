@@ -2,21 +2,24 @@ import cv2
 import numpy as np
 from PIL import Image
 
-def crop_face(image: Image.Image) -> Image.Image:
-    """从 PIL Image 中裁剪出人脸区域，返回裁剪后 PIL Image。"""
-    img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-    gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-
-    # 加载 HaarCascade 模型（OpenCV 内置）
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+def crop_face(pil_img):
+    img = np.array(pil_img.convert("RGB"))
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    detector = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    faces = detector.detectMultiScale(gray, 1.3, 5)
 
     if len(faces) == 0:
-        return image  # 如果没检测到人脸，返回原图
+        return None
 
-    # 取最大的人脸区域
-    x, y, w, h = sorted(faces, key=lambda box: box[2] * box[3], reverse=True)[0]
-    face = img_cv[y:y+h, x:x+w]
-    face_rgb = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
+    x, y, w, h = faces[0]
+    face_img = img[y:y+h, x:x+w]
+    return Image.fromarray(face_img)
 
-    return Image.fromarray(face_rgb)
+def apply_colormap_on_image(org_img, activation_map, colormap_name='jet'):
+    import matplotlib.cm as cm
+    heatmap = cm.get_cmap(colormap_name)(activation_map)
+    heatmap = np.delete(heatmap, 3, 2)  # Remove alpha channel
+    heatmap = np.uint8(255 * heatmap)
+    overlayed_img = heatmap * 0.4 + org_img * 255 * 0.6
+    overlayed_img = np.uint8(overlayed_img)
+    return Image.fromarray(overlayed_img)
