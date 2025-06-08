@@ -1,40 +1,41 @@
 import streamlit as st
-from PIL import Image
 import torch
-from model import SRSSModel
-from utils import preprocess_image, generate_heatmap, load_model_weights
+from PIL import Image
 import numpy as np
+import cv2
+from torchvision import transforms
+from model import load_model_from_hf, get_cam
+from utils import crop_face
 
-@st.cache(allow_output_mutation=True)
-def load_model():
-    model = SRSSModel()
-    # 这里替换成你的huggingface模型文件的直链，比如：
-    model_url = "https://huggingface.co/qxliu/srss_model/resolve/main/model_final_cb2.pth"
-    model = load_model_weights(model, model_url)
-    return model
 
-def main():
-    st.title("基于人脸图像的SRSS睡眠质量预测")
+st.set_page_config(page_title="SRSS 睡眠质量预测", layout="wide")
 
-    uploaded_file = st.file_uploader("上传人脸图片", type=["jpg", "jpeg", "png"])
-    if uploaded_file:
-        image = Image.open(uploaded_file).convert("RGB")
-        st.image(image, caption="上传的图片", use_column_width=True)
+st.title("😴 基于人脸图像的 SRSS 睡眠质量预测")
 
-        model = load_model()
+uploaded_file = st.file_uploader("上传一张面部图片（jpg/png）", type=['jpg', 'png'])
 
-        input_tensor = preprocess_image(image)
+if uploaded_file is not None:
+    raw_image = Image.open(uploaded_file).convert('RGB')
+    image = crop_face(raw_image)
+    st.image(image, caption='上传图像', use_column_width=True)
+
+    preprocess = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor()
+    ])
+    input_tensor = preprocess(image).unsqueeze(0)
+
+    with st.spinner("加载模型并预测中..."):
+        model = load_model_from_hf()
         with torch.no_grad():
-            pred = model(input_tensor).item()
+            prediction = model(input_tensor).item()
         
-        st.write(f"预测SRSS睡眠质量分数：{pred:.2f}")
+        st.subheader(f"预测的 SRSS 分数：`{prediction:.2f}`")
 
-        # 生成heatmap（示范：基于图像灰度强度的伪heatmap）
-        heatmap = generate_heatmap(image)
-        st.image(heatmap, caption="示例Heatmap（灰度伪热力图）", use_column_width=True)
+        # Grad-CAM 解释性图
+        grayscale_cam = get_cam(model, input_tensor)
+        input_image = np.array(image.resize((224, 224))) / 255.0
+        cam_image = (255 * cv2.cvtColor(show_cam_on_image(input_image, grayscale_cam, use_rgb=True), cv2.COLOR_RGB2BGR)).astype(np.uint8)
 
-
-
-if __name__ == "__main__":
-    main()
-
+        st.subheader("🧠 Grad-CAM 可视化")
+        st.image(cam_image, caption="模型关注区域", use_column_width=True)
