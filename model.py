@@ -30,7 +30,8 @@ def generate_gradcam(model, input_tensor, device):
     fh = target_layer.register_forward_hook(forward_hook)
     bh = target_layer.register_backward_hook(backward_hook)
 
-    output = model(input_tensor)
+    model_output_tuple = model(input_tensor)
+    output = model_output_tuple[0]
     model.zero_grad()
     output.backward(torch.ones_like(output))
 
