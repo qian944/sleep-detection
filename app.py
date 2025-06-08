@@ -17,8 +17,25 @@ st.markdown("上传一张人脸照片，获取睡眠评分（0-50，分数越高
 uploaded_file = st.file_uploader("请上传一张人脸照片（jpg/png）", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-    image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="原始上传图像", use_column_width=True)
+    image = None # 初始化 image 为 None
+    try:
+        # 尝试打开图像文件
+        # uploaded_file 是一个类文件对象，可以直接传递给 Image.open
+        image_pil = Image.open(uploaded_file)
+
+        # 转换为 RGB (如果图像是 RGBA, P (palette) 等格式)
+        # 这一步也可能因为图像问题而出错，但通常在 open() 之后问题较少
+        image = image_pil.convert("RGB")
+
+    except UnidentifiedImageError:
+        st.error("无法识别上传的文件。请确保它是一个有效的 JPG 或 PNG 图像文件，并且文件没有损坏。")
+    except Exception as e:
+        # 捕获其他可能的 PIL 相关错误或意外错误
+        st.error(f"打开或处理图像时发生错误：请检查文件是否为标准图像格式。详情: {e}")
+        # 打印详细错误到控制台供调试
+        print(f"Error opening/processing image: {e}")
+        import traceback
+        traceback.print_exc()
 
     # 裁剪并展示面部区域
     cropped = crop_face(image)
