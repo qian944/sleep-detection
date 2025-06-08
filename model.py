@@ -8,7 +8,7 @@ from utils import apply_colormap_on_image
 
 def load_model_and_predict():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ResNet18_CBAM(num_classes=1)
+    model = ResNet18_CBAM()
     hf_url = "https://huggingface.co/qxliu/srss_model/resolve/main/model_final_cb2.pth"
     state_dict = torch.hub.load_state_dict_from_url(hf_url, map_location=device)
     model.load_state_dict(state_dict)
