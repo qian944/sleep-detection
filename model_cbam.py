@@ -66,20 +66,4 @@ class ResNet18_CBAM(nn.Module):
         out = self.fc(x)
         return out, att_map
 
-class ResNet18_CBAM(nn.Module):
-    def __init__(self):
-        super().__init__()
-        base = models.resnet18(weights=ResNet18_Weights.DEFAULT)
-        self.backbone = nn.Sequential(*list(base.children())[:-2])  # 保留至conv5
-        self.cbam = CBAM(gate_channels=512)  # CBAM block 你已经定义好
-        self.pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(512, 1)
-
-    def forward(self, x):
-        feat = self.backbone(x)               # 输出维度：[B, 512, 7, 7]
-        att = self.cbam(feat)                 # CBAM 输出相同尺寸
-        pooled = self.pool(att).view(x.size(0), -1)
-        out = self.fc(pooled)
-        return out, att                       # ✅ 返回两个值
-
 
