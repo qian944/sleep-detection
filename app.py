@@ -37,25 +37,35 @@ if uploaded_file is not None:
         import traceback
         traceback.print_exc()
 
-    # 裁剪并展示面部区域
-    cropped = crop_face(image)
-    if cropped is None:
-        st.error("未检测到人脸，请上传清晰的正脸照片。")
-    else:
-        st.image(cropped, caption="检测到的面部区域", use_column_width=True)
+    if image is not None: # 只有当图像成功加载和转换后才继续
+        st.image(image, caption="原始上传图像", use_column_width="auto")
 
-        # 模型预测
-        with st.spinner("模型加载中..."):
-            model, device = load_model_and_predict()
-            transform = transforms.Compose([
-                transforms.Resize((224, 224)),
-                transforms.ToTensor(),
-            ])
-            input_tensor = transform(cropped).unsqueeze(0).to(device)
-            with torch.no_grad():
-                score = model(input_tensor)[0].item()
-                if score is not None:
-                        # --- 根据分数给出睡眠质量描述 ---
+        cropped_image = crop_face(image)
+        if cropped_image is None:
+            st.error("未检测到人脸，请上传清晰的正脸照片。")
+        else:
+            st.image(cropped_image, caption="检测到的面部区域", use_column_width="auto")
+
+            with st.spinner("模型加载和预测中..."):
+                model, device = load_model_and_predict()
+                if model is None:
+                    st.error("模型加载失败，请检查后台日志。")
+                else:
+                    transform = transforms.Compose([
+                        transforms.Resize((224, 224)),
+                        transforms.ToTensor(),
+                    ])
+                    input_tensor = transform(cropped_image).unsqueeze(0).to(device)
+                    with torch.no_grad():
+                        model_output = model(input_tensor)
+                        if isinstance(model_output, tuple) and len(model_output) > 0:
+                            score_tensor = model_output[0]
+                            score = score_tensor.item()
+                        else:
+                            st.error("模型输出格式不正确。")
+                            score = None
+
+                    if score is not None:
                         sleep_quality_description = ""
                         if score <= 10:
                             sleep_quality_description = "睡眠无问题 😊"
@@ -65,13 +75,14 @@ if uploaded_file is not None:
                             sleep_quality_description = "睡眠情况一般 😐"
                         elif 31 <= score <= 40:
                             sleep_quality_description = "睡眠情况较差 😟"
-                        elif score >= 41: # 包含大于50的情况，如果分数范围是0-50，可以写成 41 <= score <= 50
+                        elif score >= 41:
                             sleep_quality_description = "睡眠问题严重 😫"
-                        else: # 处理超出0-50范围的异常分数
+                        else:
                             sleep_quality_description = "分数异常，请检查模型或输入。"
 
                         st.success(f"预测 SRSS 分数为：**{score:.0f}**")
                         st.info(f"睡眠评估：**{sleep_quality_description}**")
+
 
             # Grad-CAM
             st.subheader("可解释性分析（Grad-CAM）")
