@@ -37,7 +37,24 @@ if uploaded_file is not None:
             input_tensor = transform(cropped).unsqueeze(0).to(device)
             with torch.no_grad():
                 score = model(input_tensor)[0].item()
-            st.success(f"预测 SRSS 分数为：**{score:.0f}**")
+            if score is not None:
+                        # --- 根据分数给出睡眠质量描述 ---
+                        sleep_quality_description = ""
+                        if score <= 10:
+                            sleep_quality_description = "睡眠无问题 😊"
+                        elif 11 <= score <= 20:
+                            sleep_quality_description = "睡眠情况较好 🙂"
+                        elif 21 <= score <= 30:
+                            sleep_quality_description = "睡眠情况一般 😐"
+                        elif 31 <= score <= 40:
+                            sleep_quality_description = "睡眠情况较差 😟"
+                        elif score >= 41: # 包含大于50的情况，如果分数范围是0-50，可以写成 41 <= score <= 50
+                            sleep_quality_description = "睡眠问题严重 😫"
+                        else: # 处理超出0-50范围的异常分数
+                            sleep_quality_description = "分数异常，请检查模型或输入。"
+
+                        st.success(f"预测 SRSS 分数为：**{score:.0f}**")
+                        st.info(f"睡眠评估：**{sleep_quality_description}**")
 
             # Grad-CAM
             st.subheader("可解释性分析（Grad-CAM）")
