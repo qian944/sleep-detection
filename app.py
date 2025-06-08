@@ -69,13 +69,13 @@ if uploaded_file is not None:
                         sleep_quality_description = ""
                         if score <= 10:
                             sleep_quality_description = "睡眠无问题 😊"
-                        elif 11 <= score <= 20:
+                        elif 10 < score <= 20:
                             sleep_quality_description = "睡眠情况较好 🙂"
-                        elif 21 <= score <= 30:
+                        elif 20 < score <= 30:
                             sleep_quality_description = "睡眠情况一般 😐"
-                        elif 31 <= score <= 40:
+                        elif 30 < score <= 40:
                             sleep_quality_description = "睡眠情况较差 😟"
-                        elif score >= 41:
+                        elif score > 40:
                             sleep_quality_description = "睡眠问题严重 😫"
                         else:
                             sleep_quality_description = "分数异常，请检查模型或输入。"
