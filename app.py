@@ -37,7 +37,7 @@ if uploaded_file is not None:
             input_tensor = transform(cropped).unsqueeze(0).to(device)
             with torch.no_grad():
                 score = model(input_tensor)[0].item()
-            if score is not None:
+                if score is not None:
                         # --- 根据分数给出睡眠质量描述 ---
                         sleep_quality_description = ""
                         if score <= 10:
