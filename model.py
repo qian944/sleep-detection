@@ -43,13 +43,22 @@ def generate_gradcam(model, input_tensor, device):
     for i, w in enumerate(weights):
         cam += w * fmap[i]
     cam = np.maximum(cam, 0)
-    cam = cam / cam.max()
+    if cam.max() > 0:
+        cam = cam / cam.max()
+    else:
+        cam = np.zeros_like(cam)
 
+    target_height = input_tensor.shape[2]
+    target_width = input_tensor.shape[3]
+
+    cam_resized = cv2.resize(cam, (target_width, target_height))
+    
     input_img = input_tensor.squeeze(0).permute(1, 2, 0).cpu().numpy()
     input_img = np.clip(input_img, 0, 1)
-    heatmap = apply_colormap_on_image(input_img, cam)
+
+    heatmap_overlay = apply_colormap_on_image(input_img, cam_resized, colormap_name='jet') # 确保 colormap_name 传递正确
 
     fh.remove()
     bh.remove()
 
-    return heatmap
+    return heatmap_overlay
