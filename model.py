@@ -5,6 +5,7 @@ from model_cbam import ResNet18_CBAM
 import matplotlib.pyplot as plt
 import numpy as np
 from utils import apply_colormap_on_image
+import cv2
 
 def load_model_and_predict():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
