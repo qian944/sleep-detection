@@ -1,32 +1,22 @@
-import torch
-from torchvision import transforms
-import numpy as np
 import cv2
+import numpy as np
+from PIL import Image
 
-# 图像预处理（保持和训练时一致）
-def preprocess_image(image):
-    preprocess = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],  # ImageNet均值
-            std=[0.229, 0.224, 0.225]
-        )
-    ])
-    return preprocess(image).unsqueeze(0)  # 增加batch维度
+def crop_face(image: Image.Image) -> Image.Image:
+    """从 PIL Image 中裁剪出人脸区域，返回裁剪后 PIL Image。"""
+    img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
 
-# 简单heatmap生成示例（基于灰度强度，演示用）
-def generate_heatmap(image):
-    # image: PIL Image，转换为灰度并归一化为0~1
-    img_gray = np.array(image.convert("L"))
-    heatmap = cv2.applyColorMap((img_gray / 255 * 255).astype(np.uint8), cv2.COLORMAP_JET)
-    heatmap = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
-    return heatmap  # numpy array (H,W,3)
+    # 加载 HaarCascade 模型（OpenCV 内置）
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
-# 加载huggingface模型权重（假设模型保存在本地或用transformers hub）
-def load_model_weights(model, model_path_or_url):
-    # 支持本地路径或网络url
-    state_dict = torch.hub.load_state_dict_from_url(model_path_or_url, map_location=torch.device('cpu'))
-    model.load_state_dict(state_dict)
-    model.eval()
-    return model
+    if len(faces) == 0:
+        return image  # 如果没检测到人脸，返回原图
+
+    # 取最大的人脸区域
+    x, y, w, h = sorted(faces, key=lambda box: box[2] * box[3], reverse=True)[0]
+    face = img_cv[y:y+h, x:x+w]
+    face_rgb = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
+
+    return Image.fromarray(face_rgb)
